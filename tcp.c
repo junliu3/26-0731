@@ -6,6 +6,33 @@
 // UNIX/LINUX STD
 #include <unistd.h>
 #include <netinet/in.h>
+#include <pthread.h>
+
+void *task(void *p)
+{
+    int fd = *((int *)p);
+    printf("连接：%d\n", fd);
+    free(p);
+
+    char buf[128];
+    while (1)
+    {
+        // 接收
+        memset(buf, 0, 128);
+        read(fd, buf, sizeof(buf));
+        printf("收到：%s\n", buf);
+        if (!strncmp(buf, "bye", 3))
+        {
+            break;
+        }
+        // 发送
+        char msg[] = "END\n";
+        write(fd, msg, sizeof(msg));
+    }
+    close(fd);
+    return NULL;
+}
+
 
 int main(int argc, char const *argv[])
 {
@@ -38,7 +65,25 @@ int main(int argc, char const *argv[])
     while (1)
     {
         // 建立连接，返回一个新的套接字描述符，用于与客户端通信
-        int c_fd = accept(s_fd, NULL, NULL);
+        // int c_fd = accept(s_fd, NULL, NULL);
+
+        int *fd = malloc(sizeof(int));
+        *fd = accept(s_fd, NULL, NULL);
+        
+        pthread_t tid;
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        // 创建线程时，设置线程属性：可分离,线程结束自动释放资源，避免出现僵死线程
+        pthread_create(&tid, &attr, task, fd);
+
+        // 分离子线程， 线程结束后自动释放相关资源
+        pthread_detach(tid);
+        // 不能 join 等待 tid 线程结束
+        // pthread_join(tid, NULL);
+
+
+        /*
         printf("client connected, fd: %d\n", c_fd);
         // 读写
         char buf[128];
@@ -56,10 +101,10 @@ int main(int argc, char const *argv[])
         char msg[] = "bye\n";
         write(c_fd, msg, sizeof(msg));
         }
+        */
         
         
-        
-        close(c_fd);
+        // close(fd);
     }
 
 
